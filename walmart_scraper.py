@@ -5,10 +5,11 @@ import time
 
 # Fake browser-like headers
 BASE_HEADERS = {
-    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-    "accept-language": "en-US;en;q=0.9",
-    "accept-encoding": "gzip, deflate, br",
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    # "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+    "accept": "application/json",
+    "accept-language": "en-US",
+    "accept-encoding": "gzip, deflate, br, zstd",
 }
 
 
