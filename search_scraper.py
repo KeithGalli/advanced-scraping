@@ -36,12 +36,12 @@ def get_product_links_from_search_page(page_number):
 
 def extract_product_info(product_url):
     print("PROCESSING URL", product_url)
-    time.sleep(2)
     response = requests.get(product_url, headers=BASE_HEADERS)
     soup = BeautifulSoup(response.text, 'html.parser')
     script_tag = soup.find('script', id='__NEXT_DATA__')
 
     if script_tag is None:
+        print("NONE\n")
         return None
 
     data = json.loads(script_tag.string)
