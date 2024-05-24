@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import queue
+import concurrent.futures
 
 BASE_URL = "https://www.walmart.com"
 OUTPUT_FILE = "product_info.jsonl"
@@ -9,14 +10,18 @@ OUTPUT_FILE = "product_info.jsonl"
 # Fake browser-like headers
 BASE_HEADERS = {
     "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-    # "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
     "accept": "application/json",
     "accept-language": "en-US",
     "accept-encoding": "gzip, deflate, br, zstd",
 }
 
 # List of search queries
-search_queries = ["computers", "laptops", "desktops", "monitors", "printers", "hard+drives", "usb", "cords", "cameras", "mouse", "keyboard", "microphones", "speakers", "radio", "tablets", "android", "apple", "watch", "smart+watch"]
+search_queries = [
+    "computers", "laptops", "desktops", "monitors", "printers", 
+    "hard+drives", "usb", "cords", "cameras", "mouse", 
+    "keyboard", "microphones", "speakers", "radio", "tablets", 
+    "android", "apple", "watch", "smart+watch"
+]
 
 # Initialize a queue for product URLs and a set for seen URLs
 product_queue = queue.Queue()
@@ -60,7 +65,7 @@ def extract_product_info(product_url):
         "item_id": product_data["usItemId"],
         "avg_rating": reviews_data.get("averageOverallRating", 0),
         "product_name": product_data["name"],
-        "brand": product_data.get("brand", ""),
+        "brand": product_data["brand"],
         "availability": product_data["availabilityStatus"],
         "image_url": product_data["imageInfo"]["thumbnailUrl"],
         "short_description": product_data.get("shortDescription", "")
@@ -70,32 +75,32 @@ def extract_product_info(product_url):
 
 def main():
     with open(OUTPUT_FILE, 'w') as file:
-        while search_queries:
-            current_query = search_queries.pop(0)
-            print("\n\nCURRENT QUERY", current_query, "\n\n")
-            page_number = 1
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            while search_queries:
+                current_query = search_queries.pop(0)
+                print("\n\nCURRENT QUERY", current_query, "\n\n")
+                page_number = 1
 
-            while True:
-                product_links = get_product_links_from_search_page(current_query, page_number)
-                if not product_links or page_number > 99:
-                    break
+                while True:
+                    product_links = get_product_links_from_search_page(current_query, page_number)
+                    if not product_links or page_number > 99:
+                        break
 
-                for link in product_links:
-                    if link not in seen_urls:
-                        product_queue.put(link)
-                        seen_urls.add(link)
+                    for link in product_links:
+                        if link not in seen_urls:
+                            product_queue.put(link)
+                            seen_urls.add(link)
 
-                while not product_queue.empty():
-                    product_url = product_queue.get()
-                    try:
-                        product_info = extract_product_info(product_url)
+                    future_to_url = {executor.submit(extract_product_info, product_queue.get()): link for link in product_links if link in seen_urls}
+
+                    for future in concurrent.futures.as_completed(future_to_url):
+                        product_info = future.result()
                         if product_info:
                             file.write(json.dumps(product_info) + "\n")
-                    except Exception as e:
-                        print(f"Failed to process URL: {product_url}. Error: {e}")
 
-                page_number += 1
-                print(page_number)
+                    page_number += 1
+                    print(page_number)
 
 if __name__ == "__main__":
     main()
+
