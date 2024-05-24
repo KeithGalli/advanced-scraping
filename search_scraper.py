@@ -28,8 +28,10 @@ def get_product_links_from_search_page(query, page_number):
     soup = BeautifulSoup(response.text, 'html.parser')
     product_links = []
 
+    found = False
     for a_tag in soup.find_all('a', href=True):
         if '/ip/' in a_tag['href']:
+            found = True
             if "https" in a_tag['href']:
                 full_url = a_tag['href']
             else:
@@ -37,6 +39,9 @@ def get_product_links_from_search_page(query, page_number):
 
             if full_url not in seen_urls:
                 product_links.append(full_url)
+
+    if not found:
+        print("\n\n\nSOUP WHEN NOT FOUND", soup)
 
     return product_links
 
