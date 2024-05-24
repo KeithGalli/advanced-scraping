@@ -2,6 +2,10 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import queue
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_URL = "https://www.walmart.com"
 OUTPUT_FILE = "product_info.jsonl"
@@ -15,6 +19,18 @@ BASE_HEADERS = {
     "accept-encoding": "gzip, deflate, br, zstd",
 }
 
+host = 'brd.superproxy.io'
+port = 22225
+username = os.environ['BRD_USERNAME']
+password = os.environ['BRD_PASSWORD']
+
+proxy_url = f'http://{username}:{password}@{host}:{port}'
+
+proxies = {
+    'http': proxy_url,
+    'https': proxy_url
+}
+
 # List of search queries
 search_queries = ["computers", "laptops", "desktops", "monitors", "printers", "hard+drives", "usb", "cords", "cameras", "mouse", "keyboard", "microphones", "speakers", "radio", "tablets", "android", "apple", "watch", "smart+watch"]
 
@@ -24,7 +40,9 @@ seen_urls = set()
 
 def get_product_links_from_search_page(query, page_number):
     search_url = f"https://www.walmart.com/search?q={query}&page={page_number}"
-    response = requests.get(search_url, headers=BASE_HEADERS)
+    # search_url = "http://lumtest.com/myip.json"
+    response = requests.get(search_url, headers=BASE_HEADERS, proxies=proxies)
+    # print(response.json())
     soup = BeautifulSoup(response.text, 'html.parser')
     product_links = []
 
@@ -47,7 +65,9 @@ def get_product_links_from_search_page(query, page_number):
 
 def extract_product_info(product_url):
     print("Processing URL", product_url)
-    response = requests.get(product_url, headers=BASE_HEADERS)
+    # product_url="http://lumtest.com/myip.json"
+    response = requests.get(product_url, headers=BASE_HEADERS, proxies=proxies)
+    # print(response.json())
     soup = BeautifulSoup(response.text, 'html.parser')
     script_tag = soup.find('script', id='__NEXT_DATA__')
 
