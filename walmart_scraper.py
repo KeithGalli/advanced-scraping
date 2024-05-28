@@ -1,46 +1,77 @@
-from bs4 import BeautifulSoup
 import requests
+from bs4 import BeautifulSoup
 import json
+import queue
 
-walmart_url = "https://www.walmart.com/ip/onn-34-Curved-Ultrawide-WQHD-3440-x-1440p-100Hz-Bezel-Less-Office-Monitor-with-Cable-Black/2522348721"
+import pprint
+import requests
+import os
+from dotenv import load_dotenv
 
-HEADERS = {
-    "Accept": "*/*",
-    "Accept-Encoding": "gzip, deflate, br, zstd",
-    "Accept-Language": "en-US,en;q=0.9",
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+load_dotenv()
+
+host = 'brd.superproxy.io'
+port = 22225
+
+username = os.environ['BRD_USERNAME']
+password = os.environ['BRD_PASSWORD']
+
+proxy_url = f'http://{username}:{password}@{host}:{port}'
+
+proxies = {
+    'http': proxy_url,
+    'https': proxy_url
 }
 
-def get_product_links(query, page_number=1):
+BASE_URL = "https://www.walmart.com"
+OUTPUT_FILE = "product_info.jsonl"
+
+# Fake browser-like headers
+BASE_HEADERS = {
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "accept": "application/json",
+    "accept-language": "en-US",
+    "accept-encoding": "gzip, deflate, br, zstd",
+}
+
+# List of search queries
+search_queries = ["computers", "laptops", "desktops", "monitors", "printers", "hard+drives", "usb", "cords", "cameras", "mouse", "keyboard", "microphones", "speakers", "radio", "tablets", "android", "apple", "watch", "smart+watch"]
+
+# Initialize a queue for product URLs and a set for seen URLs
+product_queue = queue.Queue()
+seen_urls = set()
+
+def get_product_links_from_search_page(query, page_number):
     search_url = f"https://www.walmart.com/search?q={query}&page={page_number}"
-
-    response = requests.get(search_url, headers=HEADERS)
-
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    links = soup.find_all('a', href=True)
-
+    response = requests.get(search_url, headers=BASE_HEADERS, proxies=proxies)
+    soup = BeautifulSoup(response.text, 'html.parser')
     product_links = []
 
-    for link in links:
-        link_href = link['href']
-        if "/ip/" in link_href:
-            if "https" in link_href:
-                full_url = link_href
+    found = False
+    for a_tag in soup.find_all('a', href=True):
+        if '/ip/' in a_tag['href']:
+            found = True
+            if "https" in a_tag['href']:
+                full_url = a_tag['href']
             else:
-                full_url = "https://walmart.com" + link_href
+                full_url = BASE_URL + a_tag['href']
 
-            product_links.append(full_url)
+            if full_url not in seen_urls:
+                product_links.append(full_url)
+
+    if not found:
+        print("\n\n\nSOUP WHEN NOT FOUND", soup)
 
     return product_links
 
-
 def extract_product_info(product_url):
-    response = requests.get(product_url, headers=HEADERS)
+    print("Processing URL", product_url)
+    response = requests.get(product_url, headers=BASE_HEADERS, proxies=proxies)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    script_tag = soup.find('script', id='__NEXT_DATA__')
 
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    script_tag = soup.find("script", id="__NEXT_DATA__")
+    if script_tag is None:
+        return None
 
     data = json.loads(script_tag.string)
     initial_data = data["props"]["pageProps"]["initialData"]["data"]
@@ -62,25 +93,33 @@ def extract_product_info(product_url):
     return product_info
 
 def main():
-    OUTPUT_FILE = "product_info.jsonl"
-
     with open(OUTPUT_FILE, 'w') as file:
-        page_number = 1
-        while True:
-            links = get_product_links("computers", page_number)
-            if not links or page_number > 99:
-                break
+        while search_queries:
+            current_query = search_queries.pop(0)
+            print("\n\nCURRENT QUERY", current_query, "\n\n")
+            page_number = 1
 
-            for link in links:
-                try:
-                    product_info = extract_product_info(link)
-                    if product_info:
-                        file.write(json.dumps(product_info)+"\n")
-                except Exception as e:
-                    print(f"Failed to process URL {link}. Error {e}")
+            while True:
+                product_links = get_product_links_from_search_page(current_query, page_number)
+                if not product_links or page_number > 99:
+                    break
 
-            page_number += 1
-            print(f"Search page {page_number}")
+                for link in product_links:
+                    if link not in seen_urls:
+                        product_queue.put(link)
+                        seen_urls.add(link)
+
+                while not product_queue.empty():
+                    product_url = product_queue.get()
+                    try:
+                        product_info = extract_product_info(product_url)
+                        if product_info:
+                            file.write(json.dumps(product_info) + "\n")
+                    except Exception as e:
+                        print(f"Failed to process URL: {product_url}. Error: {e}")
+
+                page_number += 1
+                print(page_number)
 
 if __name__ == "__main__":
     main()
