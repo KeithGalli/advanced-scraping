@@ -4,7 +4,10 @@ import json
 import queue
 import time
 import os
+from dotenv import load_dotenv
 from requests.exceptions import ProxyError, HTTPError
+
+load_dotenv()
 
 BASE_URL = "https://www.walmart.com"
 OUTPUT_FILE = "product_info.jsonl"
