@@ -4,10 +4,7 @@ import json
 import queue
 import time
 import os
-from dotenv import load_dotenv
-from requests.exceptions import ProxyError
-
-load_dotenv()
+from requests.exceptions import ProxyError, HTTPError
 
 BASE_URL = "https://www.walmart.com"
 OUTPUT_FILE = "product_info.jsonl"
@@ -33,7 +30,9 @@ proxies = {
 }
 
 # List of search queries
-search_queries = ["computers", "laptops", "desktops", "monitors", "printers", "hard+drives", "usb", "cords", "cameras", "mouse", "keyboard", "microphones", "speakers", "radio", "tablets", "android", "apple", "watch", "smart+watch"]
+search_queries = ["computers", "laptops", "desktops", "monitors", "printers", "hard+drives", "usb", "cords", "cameras", 
+                  "mouse", "keyboard", "microphones", "speakers", "radio", "tablets", "android", "apple", "watch", "smart+watch", 
+                  "fridge", "airconditioning", "wifi", "router", "modem", "desk", "xbox", "playstation", "nintendo"]
 
 # Initialize a queue for product URLs and a set for seen URLs
 product_queue = queue.Queue()
@@ -42,7 +41,7 @@ seen_urls = set()
 def get_product_links_from_search_page(query, page_number):
     search_url = f"https://www.walmart.com/search?q={query}&page={page_number}"
     max_retries = 5
-    backoff_factor = 2
+    backoff_factor = 3
     for attempt in range(max_retries):
         try:
             response = requests.get(search_url, headers=BASE_HEADERS, proxies=proxies)
@@ -71,6 +70,13 @@ def get_product_links_from_search_page(query, page_number):
             wait_time = backoff_factor ** attempt
             print(f"Proxy error: {e}. Retrying in {wait_time} seconds...")
             time.sleep(wait_time)
+        except HTTPError as e:
+            if e.response.status_code == 412:
+                print(f"Precondition Failed (412): {e}. Skipping URL.")
+                break
+            wait_time = backoff_factor ** attempt
+            print(f"HTTP error: {e}. Retrying in {wait_time} seconds...")
+            time.sleep(wait_time)
         except Exception as e:
             print(f"Failed to get product links for query: {query} on page: {page_number}. Error: {e}")
             break
@@ -81,7 +87,7 @@ def get_product_links_from_search_page(query, page_number):
 def extract_product_info(product_url):
     print("Processing URL", product_url)
     max_retries = 5
-    backoff_factor = 2
+    backoff_factor = 3
     for attempt in range(max_retries):
         try:
             response = requests.get(product_url, headers=BASE_HEADERS, proxies=proxies)
@@ -114,6 +120,13 @@ def extract_product_info(product_url):
         except ProxyError as e:
             wait_time = backoff_factor ** attempt
             print(f"Proxy error: {e}. Retrying in {wait_time} seconds...")
+            time.sleep(wait_time)
+        except HTTPError as e:
+            if e.response.status_code == 412:
+                print(f"Precondition Failed (412): {e}. Skipping URL.")
+                break
+            wait_time = backoff_factor ** attempt
+            print(f"HTTP error: {e}. Retrying in {wait_time} seconds...")
             time.sleep(wait_time)
         except Exception as e:
             print(f"Failed to process URL: {product_url}. Error: {e}")
