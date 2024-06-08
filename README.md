@@ -2,7 +2,7 @@
 <img src="./images/thumbnail.jpg" width="50%"/>
 <br/>
 
-Code corresponding to my [recent video] (LINK -- will be inserted when video goes live) on web scraping with Python BeautifulSoup
+Code corresponding to my [recent video](https://youtu.be/DcI_AZqfZVc) on web scraping with Python BeautifulSoup
 
 ## About/Navigation
 At certain parts of the video, I reference accessing the code at different stages of completeness. 
